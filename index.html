@@ -275,7 +275,7 @@
         },
         scales: type === 'doughnut' ? undefined : {
           x: { ticks: { color: '#55556A', font: { size: 10, family: 'Inter' }, callback: opts.xFmt || null }, grid: { color: '#2A2A32' }, stacked: opts.stacked || false },
-          y: { ticks: { color: '#9999A8', font: { size: 10, family: 'Inter' }, callback: opts.yFmt || null }, grid: { display: isHoriz ? false : true, color: '#2A2A32' }, stacked: opts.stacked || false }
+          y: { ticks: { color: '#9999A8', font: { size: 10, family: 'Inter' }, callback: opts.yFmt || null, autoSkip: false, maxRotation: 0 }, grid: { display: isHoriz ? false : true, color: '#2A2A32' }, stacked: opts.stacked || false }
         }
       }
     });
@@ -344,7 +344,7 @@
       const mes = meses[0].mes;
       const [productos, campanas] = await Promise.all([
         sbFetch('productos', { select: '*', cliente_id: `eq.${id}`, mes: `eq.${mes}`, order: 'ventas_organicas.desc' }),
-        sbFetch('campanas',  { select: '*', cliente_id: `eq.${id}`, mes: `eq.${mes}`, order: 'coste_total.desc' }),
+        sbFetch('campanas',  { select: '*', cliente_id: `eq.${id}`, mes: `eq.${mes}`, order: 'gasto.desc' }),
       ]);
 
       renderCliente(id, nombre, mes, productos, campanas);
@@ -356,14 +356,27 @@
   }
 
   function renderCliente(id, nombre, mes, productos, campanas) {
-    const ventasOrg   = productos.reduce((s,p) => s+(p.ventas_organicas||0), 0);
-    const ventasPPC   = productos.reduce((s,p) => s+(p.ventas_ppc||0), 0);
-    const totalVentas = ventasOrg + ventasPPC;
-    const uniOrg      = productos.reduce((s,p) => s+(p.unidades_organicas||0), 0);
-    const uniPPC      = productos.reduce((s,p) => s+(p.unidades_ppc||0), 0);
-    const totalUni    = uniOrg + uniPPC;
-    const totalNet    = productos.reduce((s,p) => s+(p.net_profit||0), 0);
-    const adsSpend    = campanas.reduce((s,c) => s+(c.coste_total||0), 0);
+    // Agregar por ASIN (1 fila por día en Supabase)
+    const byAsin = new Map();
+    for (const p of productos) {
+      const key = p.asin || p.sku;
+      if (!byAsin.has(key)) byAsin.set(key, { ...p, ventas_totales:0, ppc_ventas:0, ppc_gasto:0, unidades_vendidas:0 });
+      const ag = byAsin.get(key);
+      ag.ventas_totales  += p.ventas_totales||0;
+      ag.ppc_ventas      += p.ppc_ventas||0;
+      ag.ppc_gasto       += p.ppc_gasto||0;
+      ag.unidades_vendidas += p.unidades_vendidas||0;
+    }
+    const prodAgg = Array.from(byAsin.values());
+
+    const totalVentas = prodAgg.reduce((s,p) => s+(p.ventas_totales||0), 0);
+    const ventasPPC   = prodAgg.reduce((s,p) => s+(p.ppc_ventas||0), 0);
+    const ventasOrg   = Math.max(0, totalVentas - ventasPPC);
+    const totalUni    = prodAgg.reduce((s,p) => s+(p.unidades_vendidas||0), 0);
+    const uniOrg      = totalUni;
+    const uniPPC      = 0;
+    const totalNet    = prodAgg.reduce((s,p) => s+(p.net_profit||0), 0);
+    const adsSpend    = campanas.reduce((s,c) => s+(c.gasto||0), 0);
     const ventasPPCc  = campanas.reduce((s,c) => s+(c.ventas||0), 0);
     const tacos       = totalVentas>0 ? (adsSpend/totalVentas)*100 : 0;
     const roasGlobal  = adsSpend>0 ? ventasPPCc/adsSpend : 0;
@@ -376,13 +389,13 @@
     campanas.forEach(c => {
       const k = c.cartera_nombre || 'Sin cartera';
       if (!carteras[k]) carteras[k] = { inv:0, ven:0 };
-      carteras[k].inv += c.coste_total||0;
+      carteras[k].inv += c.gasto||0;
       carteras[k].ven += c.ventas||0;
     });
     const cartArr = Object.entries(carteras).sort((a,b) => b[1].ven - a[1].ven);
 
-    const top8 = [...productos].sort((a,b) => ((b.ventas_organicas||0)+(b.ventas_ppc||0)) - ((a.ventas_organicas||0)+(a.ventas_ppc||0))).slice(0,8);
-    const top10p = [...productos].sort((a,b) => ((b.ventas_organicas||0)+(b.ventas_ppc||0)) - ((a.ventas_organicas||0)+(a.ventas_ppc||0))).slice(0,10);
+    const top8 = [...prodAgg].sort((a,b) => (b.ventas_totales||0) - (a.ventas_totales||0)).slice(0,8);
+    const top10p = [...prodAgg].sort((a,b) => (b.ventas_totales||0) - (a.ventas_totales||0)).slice(0,10);
     const top10c = campanas.slice(0,10);
 
     document.getElementById('content').innerHTML = `
@@ -479,9 +492,9 @@
           <table class="data-table">
             <thead><tr><th>Campaña</th><th>Tipo</th><th style="text-align:right;">Inversión</th><th style="text-align:right;">Ventas</th><th style="text-align:right;">ROAS</th><th style="text-align:right;">ACoS</th><th style="text-align:right;">Clics</th></tr></thead>
             <tbody>${campanas.length ? campanas.map(c => {
-              const r=c.coste_total>0?c.ventas/c.coste_total:0; const a=c.ventas>0?(c.coste_total/c.ventas)*100:0;
+              const r=c.gasto>0?c.ventas/c.gasto:0; const a=c.ventas>0?(c.gasto/c.ventas)*100:0;
               const tipo=(c.campana_id||'').substring(0,2);
-              return `<tr><td style="font-size:11px;">${(c.campana_nombre||c.campana_id||'—').substring(0,45)}</td><td><span class="badge badge-neu">${tipo}</span></td><td class="td-num">${fmtEur(c.coste_total)}</td><td class="td-num">${fmtEur(c.ventas)}</td><td class="td-num"><span class="badge ${r>=3?'badge-pos':r>=2?'badge-neu':'badge-neg'}">${fmt(r,2)}x</span></td><td class="td-num"><span class="badge ${a<=20?'badge-pos':a<=35?'badge-neu':'badge-neg'}">${fmt(a,1)}%</span></td><td class="td-num">${fmt(c.clics)}</td></tr>`;
+              return `<tr><td style="font-size:11px;">${(c.campana_nombre||c.campana_id||'—').substring(0,45)}</td><td><span class="badge badge-neu">${tipo}</span></td><td class="td-num">${fmtEur(c.gasto)}</td><td class="td-num">${fmtEur(c.ventas)}</td><td class="td-num"><span class="badge ${r>=3?'badge-pos':r>=2?'badge-neu':'badge-neg'}">${fmt(r,2)}x</span></td><td class="td-num"><span class="badge ${a<=20?'badge-pos':a<=35?'badge-neu':'badge-neg'}">${fmt(a,1)}%</span></td><td class="td-num">${fmt(c.clics)}</td></tr>`;
             }).join('') : '<tr><td colspan="7" class="no-data">Sin datos de campañas.</td></tr>'}</tbody>
           </table>
         </div>
@@ -490,10 +503,10 @@
 
     // Charts
     makeChart('chartProductos', 'bar',
-      top8.map(p => (p.nombre||p.asin||'—').split('|')[0].trim().substring(0,25)),
+      top8.map(p => (p.titulo||p.nombre||p.asin||'—').split('|')[0].trim().substring(0,25)),
       [
-        { label:'Orgánico', data: top8.map(p=>p.ventas_organicas||0), backgroundColor:'#2ECC7A', borderRadius:3, borderSkipped:false },
-        { label:'PPC', data: top8.map(p=>p.ventas_ppc||0), backgroundColor:'#FF3B5C', borderRadius:3, borderSkipped:false },
+        { label:'Orgánico', data: top8.map(p=>Math.max(0,(p.ventas_totales||0)-(p.ppc_ventas||0))), backgroundColor:'#2ECC7A', borderRadius:3, borderSkipped:false, maxBarThickness:28 },
+        { label:'PPC', data: top8.map(p=>p.ppc_ventas||0), backgroundColor:'#FF3B5C', borderRadius:3, borderSkipped:false, maxBarThickness:28 },
       ],
       { legend:true, indexAxis:'y', stacked:true, xFmt: v=>fmtEur(v) }
     );
@@ -506,15 +519,15 @@
 
     makeChart('chartRoas', 'bar',
       cartArr.map(([n]) => n.substring(0,18)),
-      [{ data: cartArr.map(([,d]) => d.inv>0?+(d.ven/d.inv).toFixed(2):0), backgroundColor: cartArr.map(([,d]) => { const r=d.inv>0?d.ven/d.inv:0; return r>=3?'#2ECC7A':r>=2?'#4B6EFF':'#FF3B5C'; }), borderRadius:4, borderSkipped:false }],
+      [{ data: cartArr.map(([,d]) => d.inv>0?+(d.ven/d.inv).toFixed(2):0), backgroundColor: cartArr.map(([,d]) => { const r=d.inv>0?d.ven/d.inv:0; return r>=3?'#2ECC7A':r>=2?'#4B6EFF':'#FF3B5C'; }), borderRadius:4, borderSkipped:false, maxBarThickness:28 }],
       { yFmt: v=>`${v}x` }
     );
 
     makeChart('chartInvVen', 'bar',
       cartArr.map(([n]) => n.substring(0,18)),
       [
-        { label:'Inversión', data: cartArr.map(([,d])=>d.inv), backgroundColor:'rgba(75,110,255,0.7)', borderRadius:3, borderSkipped:false },
-        { label:'Ventas PPC', data: cartArr.map(([,d])=>d.ven), backgroundColor:'rgba(46,204,122,0.7)', borderRadius:3, borderSkipped:false },
+        { label:'Inversión', data: cartArr.map(([,d])=>d.inv), backgroundColor:'rgba(75,110,255,0.7)', borderRadius:3, borderSkipped:false, maxBarThickness:14 },
+        { label:'Ventas PPC', data: cartArr.map(([,d])=>d.ven), backgroundColor:'rgba(46,204,122,0.7)', borderRadius:3, borderSkipped:false, maxBarThickness:14 },
       ],
       { legend:true, yFmt: v=>fmtEur(v) }
     );
@@ -522,8 +535,8 @@
     makeChart('chartCampanas', 'bar',
       top10c.map(c => (c.campana_nombre||c.campana_id||'—').substring(0,28)),
       [
-        { label:'Inversión', data: top10c.map(c=>c.coste_total||0), backgroundColor:'rgba(75,110,255,0.8)', borderRadius:3, borderSkipped:false },
-        { label:'Ventas', data: top10c.map(c=>c.ventas||0), backgroundColor:'rgba(46,204,122,0.8)', borderRadius:3, borderSkipped:false },
+        { label:'Inversión', data: top10c.map(c=>c.gasto||0), backgroundColor:'rgba(75,110,255,0.8)', borderRadius:3, borderSkipped:false, maxBarThickness:14 },
+        { label:'Ventas', data: top10c.map(c=>c.ventas||0), backgroundColor:'rgba(46,204,122,0.8)', borderRadius:3, borderSkipped:false, maxBarThickness:14 },
       ],
       { legend:true, indexAxis:'y', xFmt: v=>fmtEur(v) }
     );
