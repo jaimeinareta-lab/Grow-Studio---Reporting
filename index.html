@@ -176,6 +176,18 @@
       .kpi-grid-6 { grid-template-columns: repeat(3, 1fr); }
       .chart-grid-2, .chart-grid-3 { grid-template-columns: 1fr; }
     }
+
+    /* HTML bar chart */
+    .hbar-wrap { padding: 4px 0 0; }
+    .hbar-legend { display:flex; gap:16px; margin-bottom:10px; }
+    .hbar-legend-item { display:flex; align-items:center; gap:5px; font-size:11px; color:var(--ink-mid); }
+    .hbar-legend-dot { width:10px; height:10px; border-radius:2px; flex-shrink:0; }
+    .hbar-row { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+    .hbar-label { width:175px; font-size:11px; font-weight:500; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex-shrink:0; }
+    .hbar-track { flex:1; height:16px; border-radius:3px; background:var(--surface2); overflow:hidden; display:flex; min-width:0; }
+    .hbar-seg-org { background:var(--positive); }
+    .hbar-seg-ppc { background:var(--negative); }
+    .hbar-val { width:64px; font-size:12px; font-weight:700; color:var(--ink); text-align:right; flex-shrink:0; }
   </style>
 </head>
 <body>
@@ -343,7 +355,7 @@
 
       const mes = meses[0].mes;
       const [productos, campanas] = await Promise.all([
-        sbFetch('productos', { select: '*', cliente_id: `eq.${id}`, mes: `eq.${mes}`, order: 'ventas_organicas.desc' }),
+        sbFetch('productos', { select: '*', cliente_id: `eq.${id}`, mes: `eq.${mes}`, order: 'ventas_totales.desc', limit: 5000 }),
         sbFetch('campanas',  { select: '*', cliente_id: `eq.${id}`, mes: `eq.${mes}`, order: 'gasto.desc' }),
       ]);
 
@@ -355,12 +367,23 @@
     }
   }
 
+  const COLORS_ES = new Set(['rojo','blanco','negro','azul','verde','amarillo','naranja','violeta','gris','rosa','marron','beige','turquesa','morado','lila','crema','dorado','plateado','granate','coral','fucsia','azulon','rojo','burdeos','champan','ocre']);
+  function getParentModel(titulo) {
+    if (!titulo) return titulo;
+    const firstPart = titulo.split('|')[0].trim();
+    const words = firstPart.split(/\s+/);
+    const last = (words[words.length - 1] || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+    if (COLORS_ES.has(last)) return words.slice(0, -1).join(' ');
+    return firstPart;
+  }
+
   function renderCliente(id, nombre, mes, productos, campanas) {
-    // Agregar por ASIN (1 fila por día en Supabase)
+    // Agregar por modelo padre (agrupa variantes de color del mismo producto)
     const byAsin = new Map();
     for (const p of productos) {
-      const key = p.asin || p.sku;
-      if (!byAsin.has(key)) byAsin.set(key, { ...p, ventas_totales:0, ppc_ventas:0, ppc_gasto:0, unidades_vendidas:0 });
+      const parentTitle = getParentModel(p.titulo);
+      const key = parentTitle || p.asin || p.sku;
+      if (!byAsin.has(key)) byAsin.set(key, { ...p, titulo: parentTitle || p.titulo, ventas_totales:0, ppc_ventas:0, ppc_gasto:0, unidades_vendidas:0 });
       const ag = byAsin.get(key);
       ag.ventas_totales  += p.ventas_totales||0;
       ag.ppc_ventas      += p.ppc_ventas||0;
@@ -427,7 +450,7 @@
           <div class="chart-card">
             <div class="chart-title">Top productos</div>
             <div class="chart-sub">Ventas por producto (orgánico + PPC)</div>
-            <div style="height:240px;"><canvas id="chartProductos"></canvas></div>
+            <div id="chartProductos" class="hbar-wrap"></div>
           </div>
           <div class="chart-card" style="display:flex;flex-direction:column;">
             <div class="chart-title">Orgánico vs PPC</div>
@@ -474,8 +497,7 @@
           <table class="data-table">
             <thead><tr><th>#</th><th>Producto</th><th>ASIN</th><th style="text-align:right;">Ventas</th><th style="text-align:right;">Uds.</th><th style="text-align:right;">Beneficio</th></tr></thead>
             <tbody>${top10p.length ? top10p.map((p,i) => {
-              const v=(p.ventas_organicas||0)+(p.ventas_ppc||0); const u=(p.unidades_organicas||0)+(p.unidades_ppc||0);
-              return `<tr><td style="color:var(--ink-light);font-size:11px;">${i+1}</td><td>${(p.nombre||'—').split('|')[0].trim().substring(0,50)}</td><td class="td-mono">${p.asin||'—'}</td><td class="td-num">${fmtEur(v)}</td><td class="td-num">${fmt(u)}</td><td class="td-num"><span class="badge ${(p.net_profit||0)>=0?'badge-pos':'badge-neg'}">${fmtEur(p.net_profit)}</span></td></tr>`;
+              return `<tr><td style="color:var(--ink-light);font-size:11px;">${i+1}</td><td>${(p.titulo||p.nombre||'—').split('|')[0].trim().substring(0,50)}</td><td class="td-mono">${p.asin||'—'}</td><td class="td-num">${fmtEur(p.ventas_totales)}</td><td class="td-num">${fmt(p.unidades_vendidas)}</td><td class="td-num"><span class="badge ${(p.net_profit||0)>=0?'badge-pos':'badge-neg'}">${fmtEur(p.net_profit)}</span></td></tr>`;
             }).join('') : '<tr><td colspan="6" class="no-data">Sin datos.</td></tr>'}</tbody>
           </table>
         </div>
@@ -501,15 +523,25 @@
       </div>
     `;
 
-    // Charts
-    makeChart('chartProductos', 'bar',
-      top8.map(p => (p.titulo||p.nombre||p.asin||'—').split('|')[0].trim().substring(0,25)),
-      [
-        { label:'Orgánico', data: top8.map(p=>Math.max(0,(p.ventas_totales||0)-(p.ppc_ventas||0))), backgroundColor:'#2ECC7A', borderRadius:3, borderSkipped:false, maxBarThickness:28 },
-        { label:'PPC', data: top8.map(p=>p.ppc_ventas||0), backgroundColor:'#FF3B5C', borderRadius:3, borderSkipped:false, maxBarThickness:28 },
-      ],
-      { legend:true, indexAxis:'y', stacked:true, xFmt: v=>fmtEur(v) }
-    );
+    // HTML bar chart — top productos
+    const hbarEl = document.getElementById('chartProductos');
+    if (hbarEl) {
+      const maxV = top8.length > 0 ? Math.max(...top8.map(p => p.ventas_totales||0)) : 1;
+      hbarEl.innerHTML = '<div class="hbar-legend">' +
+        '<div class="hbar-legend-item"><div class="hbar-legend-dot" style="background:var(--positive)"></div>Orgánico</div>' +
+        '<div class="hbar-legend-item"><div class="hbar-legend-dot" style="background:var(--negative)"></div>PPC</div>' +
+        '</div>' +
+        top8.map(function(p) {
+          var org = Math.max(0, (p.ventas_totales||0) - (p.ppc_ventas||0));
+          var ppc = p.ppc_ventas||0;
+          var orgW = (maxV > 0 ? org/maxV*100 : 0).toFixed(1);
+          var ppcW = (maxV > 0 ? ppc/maxV*100 : 0).toFixed(1);
+          var lbl = (p.titulo||p.asin||'—').split('|')[0].trim();
+          return '<div class="hbar-row"><div class="hbar-label" title="'+lbl+'">'+lbl+'</div>' +
+            '<div class="hbar-track"><div class="hbar-seg-org" style="width:'+orgW+'%"></div><div class="hbar-seg-ppc" style="width:'+ppcW+'%"></div></div>' +
+            '<div class="hbar-val">'+fmtEur(p.ventas_totales)+'</div></div>';
+        }).join('');
+    }
 
     makeChart('chartDonut', 'doughnut',
       ['Orgánico','PPC'],
