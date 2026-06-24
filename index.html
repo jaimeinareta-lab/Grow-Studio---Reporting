@@ -510,16 +510,17 @@
         <div class="chart-card" style="margin-bottom:10px;">
           <div class="chart-title">Top campañas por inversión</div>
           <div class="chart-sub">Las 10 campañas con mayor gasto</div>
-          <div style="height:260px;"><canvas id="chartCampanas"></canvas></div>
+          <div id="chartCampanas" class="hbar-wrap"></div>
         </div>
         <div class="chart-card">
           <table class="data-table">
-            <thead><tr><th>Campaña</th><th>Tipo</th><th style="text-align:right;">Inversión</th><th style="text-align:right;">Ventas</th><th style="text-align:right;">ROAS</th><th style="text-align:right;">ACoS</th><th style="text-align:right;">Clics</th></tr></thead>
+            <thead><tr><th>Campaña</th><th>Tipo</th><th style="text-align:right;">Inversión</th><th style="text-align:right;">Ventas</th><th style="text-align:right;">ROAS</th><th style="text-align:right;">ACoS</th><th style="text-align:right;">TACoS</th><th style="text-align:right;">Clics</th></tr></thead>
             <tbody>${campanas.length ? campanas.map(c => {
               const r=c.gasto>0?c.ventas/c.gasto:0; const a=c.ventas>0?(c.gasto/c.ventas)*100:0;
+              const tc=totalVentas>0?(c.gasto/totalVentas)*100:0;
               const tipo=(c.campana_id||'').substring(0,2);
-              return `<tr><td style="font-size:11px;">${(c.campana_nombre||c.campana_id||'—').substring(0,45)}</td><td><span class="badge badge-neu">${tipo}</span></td><td class="td-num">${fmtEur(c.gasto)}</td><td class="td-num">${fmtEur(c.ventas)}</td><td class="td-num"><span class="badge ${r>=3?'badge-pos':r>=2?'badge-neu':'badge-neg'}">${fmt(r,2)}x</span></td><td class="td-num"><span class="badge ${a<=20?'badge-pos':a<=35?'badge-neu':'badge-neg'}">${fmt(a,1)}%</span></td><td class="td-num">${fmt(c.clics)}</td></tr>`;
-            }).join('') : '<tr><td colspan="7" class="no-data">Sin datos de campañas.</td></tr>'}</tbody>
+              return `<tr><td style="font-size:11px;">${(c.campana_nombre||c.campana_id||'—').substring(0,45)}</td><td><span class="badge badge-neu">${tipo}</span></td><td class="td-num">${fmtEur(c.gasto)}</td><td class="td-num">${fmtEur(c.ventas)}</td><td class="td-num"><span class="badge ${r>=3?'badge-pos':r>=2?'badge-neu':'badge-neg'}">${fmt(r,2)}x</span></td><td class="td-num"><span class="badge ${a<=20?'badge-pos':a<=35?'badge-neu':'badge-neg'}">${fmt(a,1)}%</span></td><td class="td-num"><span class="badge ${tc<=5?'badge-pos':tc<=12?'badge-neu':'badge-neg'}">${fmt(tc,1)}%</span></td><td class="td-num">${fmt(c.clics)}</td></tr>`;
+            }).join('') : '<tr><td colspan="8" class="no-data">Sin datos de campañas.</td></tr>'}</tbody>
           </table>
         </div>
       </div>
@@ -566,14 +567,30 @@
       { legend:true, yFmt: v=>fmtEur(v) }
     );
 
-    makeChart('chartCampanas', 'bar',
-      top10c.map(c => (c.campana_nombre||c.campana_id||'—').substring(0,28)),
-      [
-        { label:'Inversión', data: top10c.map(c=>c.gasto||0), backgroundColor:'rgba(26,86,219,0.8)', borderRadius:3, borderSkipped:false, maxBarThickness:14 },
-        { label:'Ventas', data: top10c.map(c=>c.ventas||0), backgroundColor:'rgba(22,163,74,0.8)', borderRadius:3, borderSkipped:false, maxBarThickness:14 },
-      ],
-      { legend:true, indexAxis:'y', xFmt: v=>fmtEur(v) }
-    );
+    // HTML bar chart — top campañas
+    const campEl = document.getElementById('chartCampanas');
+    if (campEl) {
+      const maxInv = top10c.length > 0 ? Math.max(...top10c.map(c => c.gasto||0)) : 1;
+      const maxVen = top10c.length > 0 ? Math.max(...top10c.map(c => c.ventas||0)) : 1;
+      campEl.innerHTML = '<div class="hbar-legend">' +
+        '<div class="hbar-legend-item"><div class="hbar-legend-dot" style="background:#1A56DB"></div>Inversión</div>' +
+        '<div class="hbar-legend-item"><div class="hbar-legend-dot" style="background:#16A34A"></div>Ventas PPC</div>' +
+        '</div>' +
+        top10c.map(function(c) {
+          var invW = (maxInv > 0 ? (c.gasto||0)/maxInv*100 : 0).toFixed(1);
+          var venW = (maxVen > 0 ? (c.ventas||0)/maxVen*100 : 0).toFixed(1);
+          var lbl = (c.campana_nombre || c.campana_id || '—').substring(0, 60);
+          var roas = c.gasto > 0 ? (c.ventas/c.gasto).toFixed(2)+'x' : '—';
+          return '<div class="hbar-row">' +
+            '<div class="hbar-label" title="'+lbl+'">'+lbl+'</div>' +
+            '<div style="flex:1;display:flex;flex-direction:column;gap:2px;">' +
+              '<div class="hbar-track" style="height:10px;"><div style="width:'+invW+'%;background:#1A56DB;height:100%;border-radius:2px;"></div></div>' +
+              '<div class="hbar-track" style="height:10px;"><div style="width:'+venW+'%;background:#16A34A;height:100%;border-radius:2px;"></div></div>' +
+            '</div>' +
+            '<div class="hbar-val" style="width:80px;font-size:11px;">' + fmtEur(c.gasto) + '<br><span style="color:var(--ink-light);font-weight:400;">' + roas + '</span></div>' +
+            '</div>';
+        }).join('');
+    }
 
     document.getElementById('loadingState').style.display = 'none';
     document.getElementById('content').style.display = 'block';
