@@ -8,17 +8,17 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <style>
     :root {
-      --bg: #0D0D0F;
-      --surface: #16161A;
-      --surface2: #1E1E24;
-      --border: #2A2A32;
-      --ink: #F2F2F0;
-      --ink-mid: #9999A8;
-      --ink-light: #55556A;
-      --accent: #FF3B5C;
-      --accent2: #4B6EFF;
-      --positive: #2ECC7A;
-      --negative: #FF3B5C;
+      --bg: #F2F2F0;
+      --surface: #FFFFFF;
+      --surface2: #EBEBEB;
+      --border: #D8D8D8;
+      --ink: #0D0D0D;
+      --ink-mid: #555555;
+      --ink-light: #999999;
+      --accent: #0D0D0D;
+      --accent2: #1A56DB;
+      --positive: #16A34A;
+      --negative: #DC2626;
       --font: 'Inter', system-ui, sans-serif;
       --sidebar: 260px;
     }
@@ -149,9 +149,9 @@
 
     /* BADGES */
     .badge { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 700; }
-    .badge-pos { background: rgba(46,204,122,0.15); color: var(--positive); }
-    .badge-neg { background: rgba(255,59,92,0.15); color: var(--negative); }
-    .badge-neu { background: var(--surface2); color: var(--ink-mid); }
+    .badge-pos { background: rgba(22,163,74,0.12); color: var(--positive); }
+    .badge-neg { background: rgba(220,38,38,0.1); color: var(--negative); }
+    .badge-neu { background: var(--surface2); color: var(--ink-mid); border: 1px solid var(--border); }
 
     /* DONUT */
     .donut-wrap { display: flex; align-items: center; gap: 20px; }
@@ -282,12 +282,12 @@
         maintainAspectRatio: false,
         indexAxis: opts.indexAxis || 'x',
         plugins: {
-          legend: { display: opts.legend ?? false, labels: { color: '#9999A8', font: { size: 11, family: 'Inter' }, boxWidth: 10, padding: 12 } },
-          tooltip: { backgroundColor: '#1E1E24', borderColor: '#2A2A32', borderWidth: 1, titleColor: '#F2F2F0', bodyColor: '#9999A8', padding: 10 }
+          legend: { display: opts.legend ?? false, labels: { color: '#555555', font: { size: 11, family: 'Inter' }, boxWidth: 10, padding: 12 } },
+          tooltip: { backgroundColor: '#FFFFFF', borderColor: '#D8D8D8', borderWidth: 1, titleColor: '#0D0D0D', bodyColor: '#555555', padding: 10 }
         },
         scales: type === 'doughnut' ? undefined : {
-          x: { ticks: { color: '#55556A', font: { size: 10, family: 'Inter' }, callback: opts.xFmt || null }, grid: { color: '#2A2A32' }, stacked: opts.stacked || false },
-          y: { afterFit: isHoriz ? (axis=>{ axis.width=190; }) : undefined, ticks: { color: '#9999A8', font: { size: 10, family: 'Inter' }, callback: opts.yFmt || null, autoSkip: false, maxRotation: 0 }, grid: { display: isHoriz ? false : true, color: '#2A2A32' }, stacked: opts.stacked || false }
+          x: { ticks: { color: '#999999', font: { size: 10, family: 'Inter' }, callback: opts.xFmt || null }, grid: { color: '#EBEBEB' }, stacked: opts.stacked || false },
+          y: { afterFit: isHoriz ? (axis=>{ axis.width=190; }) : undefined, ticks: { color: '#555555', font: { size: 10, family: 'Inter' }, callback: opts.yFmt || null, autoSkip: false, maxRotation: 0 }, grid: { display: isHoriz ? false : true, color: '#EBEBEB' }, stacked: opts.stacked || false }
         }
       }
     });
@@ -460,7 +460,7 @@
               <div style="width:130px;height:130px;flex-shrink:0;"><canvas id="chartDonut"></canvas></div>
               <div class="donut-stats">
                 <div><div class="donut-stat-label"><span class="dot" style="background:var(--positive);"></span>Orgánico</div><div class="donut-stat-value positive">${fmt(pctOrg,1)}%</div><div style="font-size:11px;color:var(--ink-light);">${fmtEur(ventasOrg)}</div></div>
-                <div><div class="donut-stat-label"><span class="dot" style="background:var(--accent);"></span>PPC</div><div class="donut-stat-value" style="color:var(--accent);">${fmt(pctPPC,1)}%</div><div style="font-size:11px;color:var(--ink-light);">${fmtEur(ventasPPC)}</div></div>
+                <div><div class="donut-stat-label"><span class="dot" style="background:var(--negative);"></span>PPC</div><div class="donut-stat-value" style="color:var(--negative);">${fmt(pctPPC,1)}%</div><div style="font-size:11px;color:var(--ink-light);">${fmtEur(ventasPPC)}</div></div>
               </div>
             </div>
           </div>
@@ -547,21 +547,21 @@
 
     makeChart('chartDonut', 'doughnut',
       ['Orgánico','PPC'],
-      [{ data:[pctOrg,pctPPC], backgroundColor:['#2ECC7A','#FF3B5C'], borderWidth:0, hoverOffset:4 }],
+      [{ data:[pctOrg,pctPPC], backgroundColor:['#16A34A','#DC2626'], borderWidth:0, hoverOffset:4 }],
       { legend:false, extra:{ cutout:'72%' } }
     );
 
     makeChart('chartRoas', 'bar',
       cartArr.map(([n]) => n.substring(0,18)),
-      [{ data: cartArr.map(([,d]) => d.inv>0?+(d.ven/d.inv).toFixed(2):0), backgroundColor: cartArr.map(([,d]) => { const r=d.inv>0?d.ven/d.inv:0; return r>=3?'#2ECC7A':r>=2?'#4B6EFF':'#FF3B5C'; }), borderRadius:4, borderSkipped:false, maxBarThickness:10, barPercentage:0.5 }],
+      [{ data: cartArr.map(([,d]) => d.inv>0?+(d.ven/d.inv).toFixed(2):0), backgroundColor: cartArr.map(([,d]) => { const r=d.inv>0?d.ven/d.inv:0; return r>=3?'#16A34A':r>=2?'#1A56DB':'#DC2626'; }), borderRadius:4, borderSkipped:false, maxBarThickness:10, barPercentage:0.5 }],
       { yFmt: v=>`${v}x` }
     );
 
     makeChart('chartInvVen', 'bar',
       cartArr.map(([n]) => n.substring(0,18)),
       [
-        { label:'Inversión', data: cartArr.map(([,d])=>d.inv), backgroundColor:'rgba(75,110,255,0.7)', borderRadius:3, borderSkipped:false, maxBarThickness:14 },
-        { label:'Ventas PPC', data: cartArr.map(([,d])=>d.ven), backgroundColor:'rgba(46,204,122,0.7)', borderRadius:3, borderSkipped:false, maxBarThickness:14 },
+        { label:'Inversión', data: cartArr.map(([,d])=>d.inv), backgroundColor:'#1A56DB', borderRadius:3, borderSkipped:false, maxBarThickness:14 },
+        { label:'Ventas PPC', data: cartArr.map(([,d])=>d.ven), backgroundColor:'#16A34A', borderRadius:3, borderSkipped:false, maxBarThickness:14 },
       ],
       { legend:true, yFmt: v=>fmtEur(v) }
     );
@@ -569,8 +569,8 @@
     makeChart('chartCampanas', 'bar',
       top10c.map(c => (c.campana_nombre||c.campana_id||'—').substring(0,28)),
       [
-        { label:'Inversión', data: top10c.map(c=>c.gasto||0), backgroundColor:'rgba(75,110,255,0.8)', borderRadius:3, borderSkipped:false, maxBarThickness:14 },
-        { label:'Ventas', data: top10c.map(c=>c.ventas||0), backgroundColor:'rgba(46,204,122,0.8)', borderRadius:3, borderSkipped:false, maxBarThickness:14 },
+        { label:'Inversión', data: top10c.map(c=>c.gasto||0), backgroundColor:'rgba(26,86,219,0.8)', borderRadius:3, borderSkipped:false, maxBarThickness:14 },
+        { label:'Ventas', data: top10c.map(c=>c.ventas||0), backgroundColor:'rgba(22,163,74,0.8)', borderRadius:3, borderSkipped:false, maxBarThickness:14 },
       ],
       { legend:true, indexAxis:'y', xFmt: v=>fmtEur(v) }
     );
