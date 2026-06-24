@@ -275,7 +275,7 @@
         },
         scales: type === 'doughnut' ? undefined : {
           x: { ticks: { color: '#55556A', font: { size: 10, family: 'Inter' }, callback: opts.xFmt || null }, grid: { color: '#2A2A32' }, stacked: opts.stacked || false },
-          y: { ticks: { color: '#9999A8', font: { size: 10, family: 'Inter' }, callback: opts.yFmt || null, autoSkip: false, maxRotation: 0 }, grid: { display: isHoriz ? false : true, color: '#2A2A32' }, stacked: opts.stacked || false }
+          y: { afterFit: isHoriz ? (axis=>{ axis.width=190; }) : undefined, ticks: { color: '#9999A8', font: { size: 10, family: 'Inter' }, callback: opts.yFmt || null, autoSkip: false, maxRotation: 0 }, grid: { display: isHoriz ? false : true, color: '#2A2A32' }, stacked: opts.stacked || false }
         }
       }
     });
@@ -519,7 +519,7 @@
 
     makeChart('chartRoas', 'bar',
       cartArr.map(([n]) => n.substring(0,18)),
-      [{ data: cartArr.map(([,d]) => d.inv>0?+(d.ven/d.inv).toFixed(2):0), backgroundColor: cartArr.map(([,d]) => { const r=d.inv>0?d.ven/d.inv:0; return r>=3?'#2ECC7A':r>=2?'#4B6EFF':'#FF3B5C'; }), borderRadius:4, borderSkipped:false, maxBarThickness:28 }],
+      [{ data: cartArr.map(([,d]) => d.inv>0?+(d.ven/d.inv).toFixed(2):0), backgroundColor: cartArr.map(([,d]) => { const r=d.inv>0?d.ven/d.inv:0; return r>=3?'#2ECC7A':r>=2?'#4B6EFF':'#FF3B5C'; }), borderRadius:4, borderSkipped:false, maxBarThickness:14 }],
       { yFmt: v=>`${v}x` }
     );
 
