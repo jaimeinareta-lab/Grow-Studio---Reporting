@@ -183,7 +183,8 @@
     .hbar-legend-item { display:flex; align-items:center; gap:5px; font-size:11px; color:var(--ink-mid); }
     .hbar-legend-dot { width:10px; height:10px; border-radius:2px; flex-shrink:0; }
     .hbar-row { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
-    .hbar-label { width:175px; font-size:11px; font-weight:500; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex-shrink:0; }
+    .hbar-label { width:175px; font-size:11px; font-weight:500; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex-shrink:0; position:relative; cursor:default; }
+    .hbar-label[title]:hover::after { content:attr(title); position:absolute; bottom:calc(100% + 6px); left:0; background:rgba(13,13,13,0.92); color:#fff; padding:5px 10px; border-radius:5px; font-size:11px; white-space:normal; word-break:break-word; max-width:320px; z-index:9999; pointer-events:none; line-height:1.4; }
     .hbar-track { flex:1; height:16px; border-radius:3px; background:var(--surface2); overflow:hidden; display:flex; min-width:0; }
     .hbar-seg-org { background:var(--positive); }
     .hbar-seg-ppc { background:var(--negative); }
@@ -589,24 +590,33 @@
     // HTML bar chart — top campañas
     const campEl = document.getElementById('chartCampanas');
     if (campEl) {
-      const maxInv = top10c.length > 0 ? Math.max(...top10c.map(c => c.gasto||0)) : 1;
-      const maxVen = top10c.length > 0 ? Math.max(...top10c.map(c => c.ventas||0)) : 1;
+      const maxInv = Math.max(...top10c.map(c => c.gasto||0), 1);
+      const maxVen = Math.max(...top10c.map(c => c.ventas||0), 1);
       campEl.innerHTML = '<div class="hbar-legend">' +
         '<div class="hbar-legend-item"><div class="hbar-legend-dot" style="background:#1A56DB"></div>Inversión</div>' +
         '<div class="hbar-legend-item"><div class="hbar-legend-dot" style="background:#16A34A"></div>Ventas PPC</div>' +
         '</div>' +
         top10c.map(function(c) {
-          var invW = (maxInv > 0 ? (c.gasto||0)/maxInv*100 : 0).toFixed(1);
-          var venW = (maxVen > 0 ? (c.ventas||0)/maxVen*100 : 0).toFixed(1);
-          var lbl = (c.campana_nombre || c.campana_id || '—').substring(0, 60);
-          var roas = c.gasto > 0 ? (c.ventas/c.gasto).toFixed(2)+'x' : '—';
+          var invW = Math.max(Math.round((c.gasto||0)/maxInv*100), 1);
+          var venW = Math.max(Math.round((c.ventas||0)/maxVen*100), 1);
+          var lbl = (c.campana_nombre || c.campana_id || '—').replace(/\s*-\s*\[\d{2}\/\d{2}\]\s*$/,'').trim();
+          var roas = c.gasto > 0 ? fmt(c.ventas/c.gasto,2)+'x' : '—';
           return '<div class="hbar-row">' +
             '<div class="hbar-label" title="'+lbl+'">'+lbl+'</div>' +
-            '<div style="flex:1;display:flex;flex-direction:column;gap:2px;">' +
-              '<div class="hbar-track" style="height:10px;"><div style="width:'+invW+'%;background:#1A56DB;height:100%;border-radius:2px;"></div></div>' +
-              '<div class="hbar-track" style="height:10px;"><div style="width:'+venW+'%;background:#16A34A;height:100%;border-radius:2px;"></div></div>' +
+            '<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;">' +
+              '<div style="display:flex;align-items:center;gap:6px;">' +
+                '<div style="flex:1;height:10px;background:var(--surface2);border-radius:2px;overflow:hidden;">' +
+                  '<div style="width:'+invW+'%;height:100%;background:#1A56DB;border-radius:2px;"></div>' +
+                '</div>' +
+                '<span style="width:68px;font-size:11px;font-weight:600;font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap;">'+fmtEur(c.gasto||0)+'</span>' +
+              '</div>' +
+              '<div style="display:flex;align-items:center;gap:6px;">' +
+                '<div style="flex:1;height:10px;background:var(--surface2);border-radius:2px;overflow:hidden;">' +
+                  '<div style="width:'+venW+'%;height:100%;background:#16A34A;border-radius:2px;"></div>' +
+                '</div>' +
+                '<span style="width:68px;font-size:11px;color:var(--ink-light);text-align:right;white-space:nowrap;">'+roas+'</span>' +
+              '</div>' +
             '</div>' +
-            '<div class="hbar-val" style="width:80px;font-size:11px;">' + fmtEur(c.gasto) + '<br><span style="color:var(--ink-light);font-weight:400;">' + roas + '</span></div>' +
             '</div>';
         }).join('');
     }
