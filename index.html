@@ -367,6 +367,25 @@
     }
   }
 
+  function extractTipo(nombre) {
+    if (!nombre) return '—';
+    const n = nombre.trim().toUpperCase();
+    if (n.startsWith('SB')) return 'SB';
+    if (n.startsWith('SD')) return 'SD';
+    if (n.startsWith('SP')) return 'SP';
+    return '—';
+  }
+
+  function extractCartera(nombre) {
+    if (!nombre) return 'Sin cartera';
+    const parts = nombre.split(' - ');
+    if (parts.length >= 2) {
+      const last = parts[parts.length - 1].trim();
+      return last.replace(/\s*\[\d{2}\/\d{2}\]\s*$/, '').trim() || 'Sin cartera';
+    }
+    return 'Sin cartera';
+  }
+
   function getParentModel(titulo) {
     if (!titulo) return titulo;
     const firstPart = titulo.split('|')[0].trim();
@@ -411,7 +430,7 @@
 
     const carteras = {};
     campanas.forEach(c => {
-      const k = c.cartera_nombre || 'Sin cartera';
+      const k = c.cartera_nombre || extractCartera(c.campana_nombre);
       if (!carteras[k]) carteras[k] = { inv:0, ven:0 };
       carteras[k].inv += c.gasto||0;
       carteras[k].ven += c.ventas||0;
@@ -518,7 +537,7 @@
             <tbody>${campanas.length ? campanas.map(c => {
               const r=c.gasto>0?c.ventas/c.gasto:0; const a=c.ventas>0?(c.gasto/c.ventas)*100:0;
               const tc=totalVentas>0?(c.gasto/totalVentas)*100:0;
-              const tipo=(c.campana_id||'').substring(0,2);
+              const tipo=extractTipo(c.campana_nombre);
               return `<tr><td style="font-size:11px;">${(c.campana_nombre||c.campana_id||'—').substring(0,45)}</td><td><span class="badge badge-neu">${tipo}</span></td><td class="td-num">${fmtEur(c.gasto)}</td><td class="td-num">${fmtEur(c.ventas)}</td><td class="td-num"><span class="badge ${r>=3?'badge-pos':r>=2?'badge-neu':'badge-neg'}">${fmt(r,2)}x</span></td><td class="td-num"><span class="badge ${a<=20?'badge-pos':a<=35?'badge-neu':'badge-neg'}">${fmt(a,1)}%</span></td><td class="td-num"><span class="badge ${tc<=5?'badge-pos':tc<=12?'badge-neu':'badge-neg'}">${fmt(tc,1)}%</span></td><td class="td-num">${fmt(c.clics)}</td></tr>`;
             }).join('') : '<tr><td colspan="8" class="no-data">Sin datos de campañas.</td></tr>'}</tbody>
           </table>
