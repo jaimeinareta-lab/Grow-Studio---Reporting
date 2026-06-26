@@ -184,7 +184,6 @@
     .hbar-legend-dot { width:10px; height:10px; border-radius:2px; flex-shrink:0; }
     .hbar-row { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
     .hbar-label { width:175px; font-size:11px; font-weight:500; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex-shrink:0; position:relative; cursor:default; }
-    .hbar-row[title]:hover::after { content:attr(title); position:absolute; bottom:calc(100% + 6px); left:0; background:rgba(13,13,13,0.92); color:#fff; padding:5px 10px; border-radius:5px; font-size:11px; white-space:normal; word-break:break-word; max-width:320px; z-index:9999; pointer-events:none; line-height:1.4; }
     .hbar-track { flex:1; height:16px; border-radius:3px; background:var(--surface2); overflow:hidden; display:flex; min-width:0; }
     .hbar-seg-org { background:var(--positive); }
     .hbar-seg-ppc { background:var(--negative); }
@@ -628,7 +627,7 @@
           var orgW = (maxV > 0 ? org/maxV*100 : 0).toFixed(1);
           var ppcW = (maxV > 0 ? ppc/maxV*100 : 0).toFixed(1);
           var lbl = (p.titulo||p.asin||'—').split('|')[0].trim();
-          return '<div class="hbar-row"><div class="hbar-label" title="'+lbl+'">'+lbl+'</div>' +
+          return '<div class="hbar-row" data-tip="'+lbl.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')+'"><div class="hbar-label">'+lbl+'</div>' +
             '<div class="hbar-track"><div class="hbar-seg-org" style="width:'+orgW+'%"></div><div class="hbar-seg-ppc" style="width:'+ppcW+'%"></div></div>' +
             '<div class="hbar-val">'+fmtEur(p.ventas_totales)+'</div></div>';
         }).join('');
@@ -669,8 +668,8 @@
           var venW = Math.max(Math.round((c.ventas||0)/maxVen*100), 1);
           var lbl = (c.campana_nombre || c.campana_id || '—').replace(/\s*-\s*\[\d{2}\/\d{2}\]\s*$/,'').trim();
           var roas = c.gasto > 0 ? fmt(c.ventas/c.gasto,2)+'x' : '—';
-          return '<div class="hbar-row">' +
-            '<div class="hbar-label" title="'+lbl+'">'+lbl+'</div>' +
+          return '<div class="hbar-row" data-tip="'+lbl.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')+'">' +
+            '<div class="hbar-label">'+lbl+'</div>' +
             '<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;">' +
               '<div style="display:flex;align-items:center;gap:6px;">' +
                 '<div style="flex:1;height:10px;background:var(--surface2);border-radius:2px;overflow:hidden;">' +
@@ -697,6 +696,36 @@
   loadClientes().catch(e => {
     document.getElementById('clientList').innerHTML = `<div style="padding:16px;font-size:12px;color:var(--negative);">Error: ${e.message}</div>`;
   });
+
+  // Tooltip JS (position:fixed, nunca clipado)
+  (function() {
+    var tip = document.createElement('div');
+    tip.id = 'gs-tooltip';
+    tip.style.cssText = [
+      'position:fixed','z-index:99999','pointer-events:none',
+      'background:rgba(13,13,13,0.92)','color:#fff','padding:6px 11px',
+      'border-radius:5px','font-size:12px','line-height:1.45',
+      'max-width:320px','white-space:normal','word-break:break-word',
+      'display:none','box-shadow:0 2px 8px rgba(0,0,0,0.25)'
+    ].join(';');
+    document.body.appendChild(tip);
+    document.addEventListener('mouseover', function(e) {
+      var row = e.target.closest('.hbar-row[data-tip]');
+      if (!row) { tip.style.display = 'none'; return; }
+      tip.textContent = row.dataset.tip;
+      tip.style.display = 'block';
+    });
+    document.addEventListener('mousemove', function(e) {
+      if (tip.style.display === 'none') return;
+      var x = e.clientX + 14, y = e.clientY + 14;
+      if (x + 330 > window.innerWidth) x = e.clientX - 330;
+      if (y + 60  > window.innerHeight) y = e.clientY - 44;
+      tip.style.left = x + 'px'; tip.style.top = y + 'px';
+    });
+    document.addEventListener('mouseout', function(e) {
+      if (!e.target.closest('.hbar-row[data-tip]')) tip.style.display = 'none';
+    });
+  })();
 </script>
 </body>
 </html>
